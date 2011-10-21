@@ -64,6 +64,9 @@ static char iface[PROPERTY_VALUE_MAX];
 #ifndef WIFI_FIRMWARE_LOADER
 #define WIFI_FIRMWARE_LOADER		""
 #endif
+#ifndef WIFI_PRE_LOADER
+#define WIFI_PRE_LOADER		""
+#endif
 #define WIFI_TEST_INTERFACE		"sta"
 
 #define WIFI_DRIVER_LOADER_DELAY	1000000
@@ -80,6 +83,7 @@ static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char SUPP_CONFIG_TEMPLATE[]= "/system/etc/wifi/wpa_supplicant.conf";
 static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char MODULE_FILE[]         = "/proc/modules";
+static const char PRELOADER[]           = WIFI_PRE_LOADER;
 
 static const char AP_DRIVER_MODULE_NAME[]  = "tiap_drv";
 static const char AP_DRIVER_MODULE_TAG[]   = "tiap_drv" " ";
@@ -315,14 +319,23 @@ int hotspot_load_driver()
         return 0;
     }
 
+    if (!strcmp(PRELOADER,"") == 0) {
+        LOGW("Starting WIFI pre-loader");
+        property_set("ctl.start", PRELOADER);
+    }
+
 #ifdef WIFI_EXT_MODULE_PATH
     if (insmod(EXT_MODULE_PATH, EXT_MODULE_ARG) < 0)
         return -1;
     usleep(200000);
 #endif
 
-    if (insmod(AP_DRIVER_MODULE_PATH, AP_DRIVER_MODULE_ARG) < 0)
+    if (insmod(AP_DRIVER_MODULE_PATH, AP_DRIVER_MODULE_ARG) < 0){
+#ifdef WIFI_EXT_MODULE_NAME
+        rmmod(EXT_MODULE_NAME);
+#endif
         return -1;
+    }
 
     if (strcmp(AP_FIRMWARE_LOADER,"") == 0) {
         usleep(WIFI_DRIVER_LOADER_DELAY);
@@ -362,10 +375,12 @@ int hotspot_unload_driver()
         if (count) {
 #ifdef WIFI_EXT_MODULE_NAME
             if (rmmod(EXT_MODULE_NAME) == 0)
-                return 0;
-#else
-            return 0;
 #endif
+                if (!strcmp(PRELOADER,"") == 0) {
+                    LOGW("Stopping WIFI pre-loader");
+                    property_set("ctl.stop", PRELOADER);
+                }
+            return 0;
         }
         return -1;
     } else
@@ -418,14 +433,23 @@ int wifi_load_driver()
         return 0;
     }
 
+    if (!strcmp(PRELOADER,"") == 0) {
+        LOGW("Starting WIFI pre-loader");
+        property_set("ctl.start", PRELOADER);
+    }
+
 #ifdef WIFI_EXT_MODULE_PATH
     if (insmod(EXT_MODULE_PATH, EXT_MODULE_ARG) < 0)
         return -1;
     usleep(200000);
 #endif
 
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
+    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0){
+#ifdef WIFI_EXT_MODULE_NAME
+        rmmod(EXT_MODULE_NAME);
+#endif
         return -1;
+    }
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         usleep(WIFI_DRIVER_LOADER_DELAY);
@@ -464,10 +488,12 @@ int wifi_unload_driver()
         if (count) {
 #ifdef WIFI_EXT_MODULE_NAME
             if (rmmod(EXT_MODULE_NAME) == 0)
-                return 0;
-#else
-            return 0;
 #endif
+                if (!strcmp(PRELOADER,"") == 0) {
+                    LOGW("Stopping WIFI pre-loader");
+                    property_set("ctl.stop", PRELOADER);
+                }
+            return 0;
         }
         return -1;
     } else
